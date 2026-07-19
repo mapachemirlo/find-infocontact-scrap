@@ -2,3 +2,7 @@ ddgs>=9.0.0
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 googlesearch-python>=1.2.5
+
+# API HTTP (para que n8n llame al scraper por la red)
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
