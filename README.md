@@ -27,16 +27,29 @@ en todo el CSV, aunque venga de varias páginas o de distintos buscadores.
 
 Funciona igual en **macOS** y en **Windows 11**.
 
+**Dos formas de usarlo:**
+
+- **Por línea de comandos** (lo de siempre): `python buscar_contactos.py ...` →
+  genera los CSV. Ver [Uso](#uso).
+- **Como API HTTP** (opcional): un servidor web que expone la búsqueda para que
+  otra herramienta (por ejemplo **n8n**) la llame por la red y reciba los
+  contactos en **JSON**, sin generar CSV. Ver [Uso como API HTTP](#uso-como-api-http-con-docker).
+
+Ambas usan el mismo motor de búsqueda; podés seguir usando el CLI como siempre.
+
 ---
 
 ## Archivos del proyecto
 
 | Archivo | Qué hace |
 |---|---|
-| `buscar_contactos.py` | Programa principal (el que se ejecuta) |
+| `buscar_contactos.py` | Programa principal por línea de comandos (el que se ejecuta) |
 | `zonas.py` | Localidades de cada zona y lista de provincias (podés editarlas) |
 | `buscadores.py` | Búsqueda en todos los buscadores |
 | `extractor.py` | Descarga páginas y extrae emails, teléfonos y redes |
+| `api.py` | Capa **FastAPI**: expone la búsqueda como API HTTP (para n8n u otros) |
+| `Dockerfile` | Empaqueta el scraper + la API en un contenedor Docker |
+| `.dockerignore` | Archivos que no entran a la imagen (`venv`, CSV, etc.) |
 | `requirements.txt` | Dependencias a instalar |
 
 ---
@@ -105,6 +118,68 @@ python buscar_contactos.py --buscar "estudios contables" --zona este --sin-googl
 | `--sin-google` | No usar la consulta extra de Google | usa Google |
 | `--pausa` | Segundos de espera entre páginas | 1.0 |
 | `--autoguardar` | Guarda un respaldo cada N registros nuevos (`0` = desactivar) | 20 |
+
+---
+
+## Uso como API HTTP (con Docker)
+
+Modo **opcional**, pensado para que herramientas como **n8n** llamen al scraper
+por la red y reciban los contactos en **JSON** (no genera CSV). El uso por línea
+de comandos sigue funcionando igual; esto es una puerta adicional.
+
+### Probar en local (sin Docker)
+
+```bash
+# Con el venv activado y las dependencias instaladas:
+uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+Después abrí **http://localhost:8000/docs** en el navegador: es una página
+interactiva donde probás la búsqueda apretando botones.
+
+### Con Docker
+
+```bash
+# Construir la imagen
+docker build -t scraper-contactos .
+
+# Levantar el contenedor (API en el puerto 8000)
+docker run -p 8000:8000 scraper-contactos
+```
+
+### Endpoints
+
+| Método y ruta | Qué hace |
+|---|---|
+| `POST /buscar` | Ejecuta la búsqueda y devuelve los contactos en JSON |
+| `GET /opciones` | Lista las zonas y provincias válidas |
+| `GET /health` | Chequeo de que la API está viva |
+| `GET /docs` | Documentación interactiva (probar apretando botones) |
+
+**Ejemplo de llamada a `POST /buscar`:**
+
+```bash
+curl -X POST http://localhost:8000/buscar \
+  -H "Content-Type: application/json" \
+  -d '{"termino": "ferreterias", "zona": "oeste", "resultados": 12}'
+```
+
+**Cuerpo del pedido (JSON):**
+
+| Campo | Descripción | Default |
+|---|---|---|
+| `termino` | Qué buscar (ej: `"ferreterias"`) | (obligatorio) |
+| `zona` | `oeste`, `sur`, `este` o `norte` (obligatorio si es Buenos Aires) | `null` |
+| `provincia` | Provincia a buscar (ej: `"Cordoba"`) | `Buenos Aires` |
+| `resultados` | Páginas a revisar por consulta (1 a 50) | 12 |
+| `usar_google` | Incluir la consulta extra de Google | `true` |
+| `pausa` | Segundos de espera entre páginas | 1.0 |
+
+**Respuesta (JSON):** `{ termino, lugar, total, emails: [...], contactos: [...] }`,
+donde `contactos` trae las mismas columnas que el CSV (url, emails, teléfonos y redes).
+
+> La búsqueda puede tardar varios minutos: quien llame a la API debe usar un
+> **timeout amplio**.
 
 ---
 
