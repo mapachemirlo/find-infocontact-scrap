@@ -32,8 +32,38 @@ ZONAS = {
 }
 
 
+# Provincias de Argentina (sugerencias para el modo interactivo y para
+# validar/mostrar opciones). Buenos Aires se maneja aparte, por zonas.
+PROVINCIAS = [
+    "Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Cordoba",
+    "Corrientes", "Entre Rios", "Formosa", "Jujuy", "La Pampa", "La Rioja",
+    "Mendoza", "Misiones", "Neuquen", "Rio Negro", "Salta", "San Juan",
+    "San Luis", "Santa Cruz", "Santa Fe", "Santiago del Estero",
+    "Tierra del Fuego", "Tucuman",
+]
+
+# Formas de escribir "Buenos Aires" que activan la busqueda por zonas.
+_ALIAS_BUENOS_AIRES = {
+    "buenos aires", "provincia de buenos aires", "bsas", "bs as", "ba",
+}
+
+
 def listar_zonas():
     return list(ZONAS.keys())
+
+
+def listar_provincias():
+    return list(PROVINCIAS)
+
+
+def es_buenos_aires(provincia):
+    """True si la provincia es Buenos Aires (se busca por zonas).
+
+    Si no se indica provincia, se asume Buenos Aires (comportamiento previo).
+    """
+    if not provincia:
+        return True
+    return provincia.strip().lower() in _ALIAS_BUENOS_AIRES
 
 
 def localidades_de(zona):

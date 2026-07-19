@@ -5,10 +5,13 @@
 ================================================================================
 
 Busca en TODOS los buscadores disponibles lo que vos quieras (escuelas,
-ferreterias, gimnasios, veterinarias, estudios contables, etc.) en una zona
-de Buenos Aires (oeste, sur, este, norte), visita las paginas encontradas,
-extrae emails, telefonos y redes sociales, elimina lo repetido, y guarda lo
-unico en un archivo .csv.
+ferreterias, gimnasios, veterinarias, estudios contables, etc.), visita las
+paginas encontradas, extrae emails, telefonos y redes sociales, elimina lo
+repetido, y guarda lo unico en un archivo .csv.
+
+Donde buscar:
+    - En Buenos Aires: elegis una zona (oeste, sur, este, norte).
+    - En cualquier otra provincia: elegis la provincia (se ignora la zona).
 
 USO RAPIDO (interactivo, te pregunta que y donde):
     python buscar_contactos.py
@@ -16,8 +19,8 @@ USO RAPIDO (interactivo, te pregunta que y donde):
 USO POR LINEA DE COMANDOS:
     python buscar_contactos.py --buscar "ferreterias" --zona oeste
     python buscar_contactos.py --buscar "gimnasios" --zona norte --resultados 20
-    python buscar_contactos.py --buscar "veterinarias" --zona sur --salida vet_sur.csv
-    python buscar_contactos.py --buscar "escuelas" --zona este --sin-google
+    python buscar_contactos.py --buscar "veterinarias" --provincia "Cordoba"
+    python buscar_contactos.py --buscar "escuelas" --provincia "Santa Fe" --salida escuelas_sf.csv
 
 Funciona igual en macOS y en Windows 11.
 """
@@ -32,14 +35,26 @@ import buscadores
 import extractor
 
 
-def construir_consultas(termino, zona):
-    """Genera las frases de busqueda combinando el termino con cada localidad."""
-    localidades = zonas.localidades_de(zona)
-    consultas = []
-    for loc in localidades:
-        consultas.append(f'{termino} "{loc}" Buenos Aires contacto email telefono')
-        consultas.append(f'{termino} en {loc} telefono direccion')
-    return consultas
+def construir_consultas(termino, zona, provincia="Buenos Aires"):
+    """Genera las frases de busqueda segun donde se quiera buscar.
+
+    - En Buenos Aires: una consulta por cada localidad de la ZONA elegida
+      (oeste, sur, este, norte), como siempre.
+    - En cualquier otra provincia: se busca por la provincia entera
+      (la zona se ignora).
+    """
+    if zonas.es_buenos_aires(provincia):
+        consultas = []
+        for loc in zonas.localidades_de(zona):
+            consultas.append(f'{termino} "{loc}" Buenos Aires contacto email telefono')
+            consultas.append(f'{termino} en {loc} telefono direccion')
+        return consultas
+
+    # Fuera de Buenos Aires: busqueda por provincia completa.
+    return [
+        f'{termino} "{provincia}" Argentina contacto email telefono',
+        f'{termino} en {provincia} Argentina telefono direccion',
+    ]
 
 
 def _fila_vacia(termino, zona, url):
@@ -51,7 +66,7 @@ def _fila_vacia(termino, zona, url):
     return fila
 
 
-def buscar(termino, zona, resultados_por_consulta, usar_google, pausa,
+def buscar(termino, zona, provincia, resultados_por_consulta, usar_google, pausa,
            carpeta=None, base=None, autoguardar=20):
     """Ejecuta la busqueda completa. Devuelve lista de filas.
 
@@ -59,13 +74,20 @@ def buscar(termino, zona, resultados_por_consulta, usar_google, pausa,
     respaldo cada 'autoguardar' registros nuevos (por si se corta la luz, se
     cierra la terminal, etc.). Poner autoguardar=0 para desactivar el respaldo.
     """
-    consultas = construir_consultas(termino, zona)
+    en_bsas = zonas.es_buenos_aires(provincia)
+    # Etiqueta del lugar: la zona (en Buenos Aires) o el nombre de la provincia.
+    etiqueta = zona if en_bsas else provincia
+
+    consultas = construir_consultas(termino, zona, provincia)
     if not consultas:
-        print(f"[!] Zona desconocida: '{zona}'. Zonas validas: "
-              f"{', '.join(zonas.listar_zonas())}")
+        if en_bsas:
+            print(f"[!] Zona desconocida: '{zona}'. Zonas validas: "
+                  f"{', '.join(zonas.listar_zonas())}")
+        else:
+            print(f"[!] No se pudo armar la busqueda para '{provincia}'.")
         return []
 
-    print(f"\n=== Buscando '{termino}' en ZONA {zona.upper()} ===")
+    print(f"\n=== Buscando '{termino}' en {etiqueta.upper()} ===")
     print(f"    {len(consultas)} consultas | "
           f"{resultados_por_consulta} resultados c/u | "
           f"Google extra: {'si' if usar_google else 'no'}\n")
@@ -115,7 +137,7 @@ def buscar(termino, zona, resultados_por_consulta, usar_google, pausa,
                 print(f"            emails: {len(emails_nuevos)} | "
                       f"tel: {len(tel_nuevos)} | redes: {n_redes}")
 
-                fila = _fila_vacia(termino, zona, url)
+                fila = _fila_vacia(termino, etiqueta, url)
                 fila["emails"] = "; ".join(sorted(emails_nuevos))
                 fila["telefonos"] = "; ".join(sorted(tel_nuevos))
                 for r in extractor.REDES:
@@ -187,30 +209,45 @@ def guardar_resultados(filas, carpeta, base, respaldo=False):
         print(f"    - mails_{base}.csv       ({len(emails)} mails para campania)")
 
 
-def modo_interactivo():
-    """Pregunta que buscar y en que zona si no se paso por linea de comandos."""
+def modo_interactivo(termino=None, provincia=None, zona=None):
+    """Completa de forma interactiva los datos que falten.
+
+    Pregunta que buscar, en que provincia y (solo si es Buenos Aires) en que
+    zona. Devuelve (termino, provincia, zona).
+    """
     print("=" * 64)
-    print(" Buscador de contactos por zona (emails, telefonos y redes)")
+    print(" Buscador de contactos por zona/provincia (emails, telefonos y redes)")
     print("=" * 64)
 
-    termino = ""
     while not termino:
         termino = input(
             "\n Que queres buscar? (ej: ferreterias, gimnasios, escuelas): "
         ).strip()
 
-    print("\n Zonas disponibles:")
-    for z in zonas.listar_zonas():
-        locs = ", ".join(zonas.localidades_de(z)[:4])
-        print(f"   - {z:6} ({locs}...)")
+    if provincia is None:
+        print("\n Provincias disponibles:")
+        for i, p in enumerate(zonas.listar_provincias(), 1):
+            print(f"   {i:2}. {p}")
+        provincia = input(
+            "\n En que provincia? (Enter = Buenos Aires): "
+        ).strip() or "Buenos Aires"
 
-    zona = ""
-    while zona not in zonas.listar_zonas():
-        zona = input("\n Elegi una zona (oeste/sur/este/norte): ").strip().lower()
-        if zona not in zonas.listar_zonas():
-            print("   Zona invalida, proba de nuevo.")
+    # Solo en Buenos Aires se elige zona; en otras provincias no aplica.
+    if zonas.es_buenos_aires(provincia) and not zona:
+        print("\n Zonas disponibles (Buenos Aires):")
+        for z in zonas.listar_zonas():
+            locs = ", ".join(zonas.localidades_de(z)[:4])
+            print(f"   - {z:6} ({locs}...)")
 
-    return termino, zona
+        zona = ""
+        while zona not in zonas.listar_zonas():
+            zona = input(
+                "\n Elegi una zona (oeste/sur/este/norte): "
+            ).strip().lower()
+            if zona not in zonas.listar_zonas():
+                print("   Zona invalida, proba de nuevo.")
+
+    return termino, provincia, zona
 
 
 def _slug(texto):
@@ -226,8 +263,12 @@ def main():
     )
     parser.add_argument("--buscar", "--termino", dest="termino",
                         help='Que buscar. Ej: "ferreterias", "gimnasios".')
-    parser.add_argument("--zona", choices=zonas.listar_zonas(),
-                        help="Zona a buscar (oeste, sur, este, norte).")
+    parser.add_argument("--zona", choices=zonas.listar_zonas(), default=None,
+                        help="Zona de Buenos Aires (oeste, sur, este, norte). "
+                             "Solo aplica si la provincia es Buenos Aires.")
+    parser.add_argument("--provincia", default=None,
+                        help='Provincia a buscar. Ej: "Cordoba", "Santa Fe". '
+                             'Por defecto Buenos Aires (que se busca por zona).')
     parser.add_argument("--resultados", type=int, default=12,
                         help="Resultados por consulta (default: 12).")
     parser.add_argument("--salida", default=None,
@@ -242,19 +283,34 @@ def main():
                              "(default: 20; usar 0 para desactivar).")
     args = parser.parse_args()
 
-    # Si falta el termino o la zona, se pregunta de forma interactiva.
-    if not args.termino or not args.zona:
-        termino, zona = modo_interactivo()
-    else:
-        termino, zona = args.termino, args.zona
+    termino = args.termino
+    provincia = args.provincia
+    zona = args.zona
+
+    # Si dieron zona pero no provincia, se asume Buenos Aires.
+    if provincia is None and zona:
+        provincia = "Buenos Aires"
+
+    # Falta algo si: no hay termino, no se sabe la provincia, o es Buenos
+    # Aires pero todavia no se eligio la zona. En esos casos, se pregunta.
+    faltan_datos = (
+        not termino
+        or provincia is None
+        or (zonas.es_buenos_aires(provincia) and not zona)
+    )
+    if faltan_datos:
+        termino, provincia, zona = modo_interactivo(termino, provincia, zona)
+
+    # Etiqueta del lugar para nombrar los archivos: zona o provincia.
+    etiqueta = zona if zonas.es_buenos_aires(provincia) else provincia
 
     # 'base' es el nombre que llevan los archivos y la carpeta que se crea.
     base = _slug(args.salida.replace(".csv", "")) if args.salida \
-        else f"{_slug(termino)}_{zona}"
+        else f"{_slug(termino)}_{_slug(etiqueta)}"
     carpeta = base   # se crea al momento con el nombre de la busqueda
 
     filas = buscar(
-        termino, zona,
+        termino, zona, provincia,
         resultados_por_consulta=args.resultados,
         usar_google=not args.sin_google,
         pausa=args.pausa,
