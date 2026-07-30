@@ -47,7 +47,9 @@ def construir_consultas(termino, zona, provincia="Buenos Aires"):
         consultas = []
         for loc in zonas.localidades_de(zona):
             consultas.append(f'{termino} "{loc}" Buenos Aires contacto email telefono')
-            consultas.append(f'{termino} en {loc} telefono direccion')
+            # "Buenos Aires" anclado tambien en la 2da plantilla: sin esto,
+            # barrios como "Palermo" traian resultados de Palermo (Italia).
+            consultas.append(f'{termino} en {loc} Buenos Aires telefono direccion')
         return consultas
 
     # Fuera de Buenos Aires: busqueda por provincia completa.

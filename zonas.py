@@ -29,6 +29,13 @@ ZONAS = {
         "Capital Federal", "CABA", "Puerto Madero", "La Boca",
         "Barracas", "San Telmo", "Palermo", "Belgrano", "Nunez",
     ],
+    # CABA acotada: barrios puntuales para prospectar Capitan Comanda (jul-2026).
+    # NO usar "este" completa para esto; esta es la lista que pide el flujo n8n
+    # con zona="caba". Puerto Madero se incluye a proposito aca aunque tambien
+    # figure en "este". (Convive sin problema con la busqueda por provincias.)
+    "caba": [
+        "Palermo", "Belgrano", "Nunez", "Recoleta", "Puerto Madero",
+    ],
 }
 
 

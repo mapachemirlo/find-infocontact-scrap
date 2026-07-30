@@ -16,15 +16,15 @@ import time
 # Todos los motores que soporta el metabuscador ddgs para busqueda de texto.
 # El orden es el de consulta. Podes comentar los que no quieras usar.
 MOTORES_DDGS = [
-    "duckduckgo",
-    "google",
+    # \"duckduckgo\",  # desactivado: no aporta desde IP del VPS
+    # \"google\",  # desactivado: no aporta desde IP del VPS
     "bing",
-    "brave",
+    # \"brave\",  # desactivado: no aporta desde IP del VPS
     "yahoo",
-    "mojeek",
-    "startpage",
+    # \"mojeek\",  # desactivado: no aporta desde IP del VPS
+    # \"startpage\",  # desactivado: no aporta desde IP del VPS
     "yandex",
-    "wikipedia",
+    # \"wikipedia\",  # desactivado: no aporta desde IP del VPS
 ]
 
 
